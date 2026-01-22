@@ -22,7 +22,7 @@ def word_counting(text,vocab_count,pair_count):
         else:
             vocab_count[word_tuple] = 1
         for pair in pair_tuple:
-            if pair in pair_count.keys():
+            if pair in pair_count:
                 pair_count[pair]+=1
             else:
                 pair_count[pair]=1
@@ -40,7 +40,7 @@ def update_word_counting_dict(original_tuple,merge_pair):#used to update the wor
 
     return merge_tuple 
 
-def _process_chunk_worker(input_path, start, end, main_token_str):
+def _process_chunk_worker(input_path, start, end, special_tokens):
     
     local_word_counts = Counter()
     local_pair_counts = Counter()
@@ -49,12 +49,13 @@ def _process_chunk_worker(input_path, start, end, main_token_str):
         f.seek(start)
         chunk_bytes = f.read(end - start)
         chunk_text = chunk_bytes.decode("utf-8", errors="ignore")
+    
+    pattern = "|".join(re.escape(st) for st in special_tokens)
+    parts = re.split(pattern, chunk_text)
         
-        parts = chunk_text.split(main_token_str)
-        
-        for part in parts:
-            if part: 
-                word_counting(part, local_word_counts, local_pair_counts)
+    for part in parts:
+        if part: 
+            word_counting(part, local_word_counts, local_pair_counts)
                 
     return local_word_counts, local_pair_counts
 
@@ -83,7 +84,7 @@ def train_bpe(input_path,vocab_size,special_tokens):
         boundaries = find_chunk_boundaries(f,num_workers,sep_bytes)
     tasks = []
     for start,end in zip(boundaries[:-1],boundaries[1:]):
-        tasks.append((input_path,start,end,main_token))
+        tasks.append((input_path,start,end,special_tokens))
 
     with multiprocessing.Pool(processes=num_workers) as pool:
         results = pool.starmap(_process_chunk_worker, tasks)
