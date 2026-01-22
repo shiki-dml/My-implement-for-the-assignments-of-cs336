@@ -74,7 +74,7 @@ def train_bpe(input_path,vocab_size,special_tokens):
     sep_bytes = main_token.encode('utf-8')
     num_process = os.cpu_count() #the number of parallel processinges
 
-    num_workers = max(1,multiprocessing.cpu_count()-1)
+    num_workers = multiprocessing.cpu_count()
 
     with open(input_path,"rb") as f:
         boundaries = find_chunk_boundaries(f,num_workers,sep_bytes)
