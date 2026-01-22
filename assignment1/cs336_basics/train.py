@@ -94,63 +94,48 @@ def train_bpe(input_path,vocab_size,special_tokens):
     #at this point, word_counting_dict and pair_counting_dict contains all pre-tokenized words and their counts
     #what is next to do for word_counting_dict is to update it according to merges
     while len(vocab) < vocab_size:
-        max_pair = max(pair_counting_dict.items(),key = lambda item :(item[1],item[0]))[0]
-        #note that item[1] is the count, item[0] is the pair itself, so we first sory by count
-        #then sory in lexicographical order 
-
-        merges.append(max_pair)
-        vocab[idx] = max_pair[0]+max_pair[1] #the max_pair is a tuple of two elements
-        idx +=1
-
-        test_tuple = (max_pair[0],max_pair[1])
-        reset_tuple = max_pair[0]+max_pair[1] 
-        #used for testing if the max_pair exists in the tuple of word_counting_dict
-        #reset_tuple is used to update the pair_counting_dict
-            
-        #then we update the word_couting_dict and pair_counting_dict
-        key_to_delete_word = []
-        key_to_add_word = []
-        count_to_add_word = []
+        if not pair_counting_dict:
+            break
+        # find the most frequent pair
+        max_pair = max(pair_counting_dict.items(), key=lambda item: (item[1], item[0]))[0]
         
-        for tup in word_counting_dict:
-            num_1 = len(tup)
-            if num_1 <2:
+        # store the max_pair into merges
+        merges.append(max_pair)
+        new_token = max_pair[0] + max_pair[1]
+        vocab[idx] = new_token
+        idx += 1
+        # store the change of words
+        changes = []
+
+        current_words = list(word_counting_dict.keys())
+        for word in current_words:
+            #accelerate
+            if max_pair[0] not in word:
                 continue
-            else:
-                for i in range(num_1-1):
-                    if tup[i] == max_pair[0] and tup[i+1] == max_pair[1]:
-                        new_tuple = update_word_counting_dict(tup,test_tuple)
-                        count = word_counting_dict[tup]
-                        key_to_add_word.append(new_tuple)
-                        count_to_add_word.append(count)
-                        key_to_delete_word.append(tup)
-                        break
-                    #test_tuple in tup, note that this process updates each element
-                    #of word_counting_dict which contains the max_pair
             
+            new_word = update_word_counting_dict(word, max_pair)
+            
+            if new_word != word:
+                count = word_counting_dict[word]
+                changes.append((word, new_word, count))
 
-        for k in key_to_delete_word:
-            del word_counting_dict[k]
-        for k,c in zip(key_to_add_word,count_to_add_word):
-            if k in word_counting_dict:
-                word_counting_dict[k] += c
-            else:
-                word_counting_dict[k] = c
+        for old_word, new_word, count in changes:
+            
+            #update word_counting_dict
+            del word_counting_dict[old_word]
+            word_counting_dict[new_word] = word_counting_dict.get(new_word, 0) + count
 
-        #to update pair_counting_dict, we re-run it on word_counting_dict
-        pair_counting_dict = {}
-        for token in word_counting_dict:
-            count = word_counting_dict[token]
-            length = len(token)
-            if length <2:
-                continue
-            else:
-                for i in range(length-1):
-                    pair_tuple = (token[i],token[i+1])
-                    if pair_tuple in pair_counting_dict:
-                        pair_counting_dict[pair_tuple] += count
-                    else:
-                        pair_counting_dict[pair_tuple] = count
+            #then updatee pair_counting_dict
+            #note that we only need to update the pairs that are affected by the change from old_word to new_word       
+            for i in range(len(old_word) - 1):
+                p = (old_word[i], old_word[i+1])
+                pair_counting_dict[p] -= count
+                if pair_counting_dict[p] == 0:
+                    del pair_counting_dict[p]
+            #append new pairs into pair_counting_dict
+            for i in range(len(new_word) - 1):
+                p = (new_word[i], new_word[i+1])
+                pair_counting_dict[p] = pair_counting_dict.get(p, 0) + count
 
     return vocab,merges
 #vocab:dict[int.bytes] merges:list[tuple[bytes,bytes]]
