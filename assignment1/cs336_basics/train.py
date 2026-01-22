@@ -3,6 +3,7 @@ import regex as re
 import multiprocessing
 from collections import Counter
 import os
+from tqdm import tqdm
 from cs336_basics.pretokenization_example import find_chunk_boundaries
 PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
 
@@ -72,10 +73,10 @@ def train_bpe(input_path,vocab_size,special_tokens):
 
     main_token = special_tokens[0] #use the first special token as the separator
     sep_bytes = main_token.encode('utf-8')
-    num_process = os.cpu_count() #the number of parallel processinges
 
-    num_workers = multiprocessing.cpu_count()
+    num_workers = multiprocessing.cpu_count() #the number of parallel processinges
 
+    print("Reading file and counting words")
     with open(input_path,"rb") as f:
         boundaries = find_chunk_boundaries(f,num_workers,sep_bytes)
     tasks = []
@@ -84,12 +85,15 @@ def train_bpe(input_path,vocab_size,special_tokens):
 
     with multiprocessing.Pool(processes=num_workers) as pool:
         results = pool.starmap(_process_chunk_worker, tasks)
-
+    print("Finished counting words, starting aggregration")
     for local_words, local_pairs in results:
         for word,count in local_words.items():
             word_counting_dict[word] = word_counting_dict.get(word,0) + count
         for pair,count in local_pairs.items():
             pair_counting_dict[pair] = pair_counting_dict.get(pair,0) + count
+
+    print("Finished aggregration, starting BPE merges")
+    pbar = tqdm(total=vocab_size - len(vocab))
 
     #at this point, word_counting_dict and pair_counting_dict contains all pre-tokenized words and their counts
     #what is next to do for word_counting_dict is to update it according to merges
@@ -104,6 +108,9 @@ def train_bpe(input_path,vocab_size,special_tokens):
         new_token = max_pair[0] + max_pair[1]
         vocab[idx] = new_token
         idx += 1
+
+        pbar.update(1)
+
         # store the change of words
         changes = []
 
@@ -136,6 +143,6 @@ def train_bpe(input_path,vocab_size,special_tokens):
             for i in range(len(new_word) - 1):
                 p = (new_word[i], new_word[i+1])
                 pair_counting_dict[p] = pair_counting_dict.get(p, 0) + count
-
+    pbar.close()
     return vocab,merges
 #vocab:dict[int.bytes] merges:list[tuple[bytes,bytes]]
