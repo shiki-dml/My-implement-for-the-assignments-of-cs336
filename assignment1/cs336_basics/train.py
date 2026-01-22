@@ -5,6 +5,7 @@ from collections import Counter
 import os
 from tqdm import tqdm
 from cs336_basics.pretokenization_example import find_chunk_boundaries
+from collections import defaultdict
 PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
 
 
@@ -62,6 +63,7 @@ def train_bpe(input_path,vocab_size,special_tokens):
 
     merges = [] #initialize merges list
     word_counting_dict ={} #initialize temporary list for each word
+    pair_to_words = defaultdict(set) #initialize pair to words mapping
     pair_counting_dict = {} #initialize temporary list for each pair
     vocab = {i:bytes([i]) for i in range(256)} #initialize vocab with 256 bytes
 
@@ -92,6 +94,12 @@ def train_bpe(input_path,vocab_size,special_tokens):
         for pair,count in local_pairs.items():
             pair_counting_dict[pair] = pair_counting_dict.get(pair,0) + count
 
+    #pair_to_words stores the words affected by each pair
+    #in effect, which word contains which pair
+    for word in word_counting_dict.keys():
+        for i in range(len(word)-1):
+            pair = (word[i],word[i+1])
+            pair_to_words[pair].add(word)
     print("Finished aggregration, starting BPE merges")
     pbar = tqdm(total=vocab_size - len(vocab))
 
@@ -111,38 +119,33 @@ def train_bpe(input_path,vocab_size,special_tokens):
 
         pbar.update(1)
 
-        # store the change of words
-        changes = []
-
-        current_words = list(word_counting_dict.keys())
-        for word in current_words:
-            #accelerate
-            if max_pair[0] not in word:
-                continue
-            
-            new_word = update_word_counting_dict(word, max_pair)
-            
-            if new_word != word:
-                count = word_counting_dict[word]
-                changes.append((word, new_word, count))
-
-        for old_word, new_word, count in changes:
-            
-            #update word_counting_dict
+        #we list all words affected by the max_pair
+        #and only updatee those words affected to raise efficiency
+        affected_words = list(pair_to_words.get(max_pair, []))
+        #delete the max_pair in pair_to_words
+        if max_pair in pair_to_words:
+            del pair_to_words[max_pair]
+        for old_word in affected_words:
+            count = word_counting_dict[old_word]
+            new_word = update_word_counting_dict(old_word, max_pair)
+        
             del word_counting_dict[old_word]
             word_counting_dict[new_word] = word_counting_dict.get(new_word, 0) + count
-
-            #then updatee pair_counting_dict
-            #note that we only need to update the pairs that are affected by the change from old_word to new_word       
-            for i in range(len(old_word) - 1):
+            
+            #update pair_to_words for the affected words
+            for i in range(len(old_word)-1):
                 p = (old_word[i], old_word[i+1])
                 pair_counting_dict[p] -= count
-                if pair_counting_dict[p] == 0:
+                if pair_counting_dict[p] <= 0:
                     del pair_counting_dict[p]
-            #append new pairs into pair_counting_dict
-            for i in range(len(new_word) - 1):
+
+                if p in pair_to_words:
+                    pair_to_words[p].discard(old_word)
+            for i in range(len(new_word)-1):
                 p = (new_word[i], new_word[i+1])
                 pair_counting_dict[p] = pair_counting_dict.get(p, 0) + count
+                pair_to_words[p].add(new_word)
+
     pbar.close()
     return vocab,merges
 #vocab:dict[int.bytes] merges:list[tuple[bytes,bytes]]
