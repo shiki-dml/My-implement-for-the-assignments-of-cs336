@@ -6,5 +6,6 @@ This repository is used to store the codes and some notes for my CS336 course st
     * Class Tokenizer
 * Transformer Language Model Architecture
     * Linear Module
-    * Embedding Module(to be finised next)
+    * Embedding Module
+    * Root Mean Square Layer Normalization(to be finished next)
 
