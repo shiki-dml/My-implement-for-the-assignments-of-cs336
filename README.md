@@ -7,5 +7,7 @@ This repository is used to store the codes and some notes for my CS336 course st
 * Transformer Language Model Architecture
     * Linear Module
     * Embedding Module
-    * Root Mean Square Layer Normalization(to be finished next)
+    * Root Mean Square Layer Normalization
+    * the SwiGLU
+    * RotaryPositionalEmbedding(to be finished next)
 
