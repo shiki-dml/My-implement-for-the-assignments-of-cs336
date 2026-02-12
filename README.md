@@ -8,6 +8,9 @@ This repository is used to store the codes and some notes for my CS336 course st
     * Linear Module
     * Embedding Module
     * Root Mean Square Layer Normalization
-    * the SwiGLU
-    * RotaryPositionalEmbedding(to be finished next)
+    * Position-Wise Feed-Forward Network
+    * Relative Positional Embeddings
+    * Scaled Dot-Product Attention
+    * Causal Multi-Head Self-Attention
+    * The Full Transformer LM(to be finished next)
 
