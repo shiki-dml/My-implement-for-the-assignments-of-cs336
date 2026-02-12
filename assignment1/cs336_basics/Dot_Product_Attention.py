@@ -21,7 +21,8 @@ def softmax(x:torch.Tensor,i:int):
 def Scaled_dot_product_attention(Q,K,V,mask = None):
     d_k = Q.shape[-1]
     temp = einsum(Q,K,'... q d_k, ... p d_k -> ... q p')/torch.sqrt(torch.tensor(d_k))
-    temp = temp.masked_fill(mask == False, float('-inf'))
+    if mask is not None:
+        temp = temp.masked_fill(mask==False, float('-inf'))
     res = softmax(temp,-1)#find the most likely key, so the last dimension
     return einsum(res,V,'... q p, ... p v -> ... q v')
 
