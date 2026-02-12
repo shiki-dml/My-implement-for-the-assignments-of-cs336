@@ -15,6 +15,7 @@ from cs336_basics.Linear_class import Linear
 from cs336_basics.Embedding_class import Embedding
 from cs336_basics.RMSnorm_class import RMSnorm
 from cs336_basics.SwiGLU import SwiGLU
+from cs336_basics.Rope_class import  RoPe
 
 def run_linear(
     d_in: int,
@@ -214,8 +215,10 @@ def run_rope(
     Returns:
         Float[Tensor, " ... sequence_length d_k"]: Tensor with RoPEd input.
     """
-    raise NotImplementedError
 
+    model = RoPe(theta,d_k,max_seq_len)
+
+    return model(in_query_or_key,token_positions)
 
 def run_transformer_block(
     d_model: int,
