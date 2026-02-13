@@ -8,6 +8,7 @@ import numpy.typing as npt
 import torch
 from jaxtyping import Bool, Float, Int
 from torch import Tensor
+from torch import nn
 
 from cs336_basics.train import train_bpe
 from cs336_basics.Tokenizer_class import Tokenizer
@@ -19,7 +20,7 @@ from cs336_basics.Rope_class import  RoPe
 from cs336_basics.Dot_Product_Attention import softmax
 from cs336_basics.Dot_Product_Attention import Scaled_dot_product_attention
 from cs336_basics.Causal_Multi_Head_Self_Attention import CausalMultiHeadSelfAttention
-
+from cs336_basics.transformer_lm import TransformerBlock
 
 def run_linear(
     d_in: int,
@@ -158,7 +159,12 @@ def run_multihead_self_attention(
         implementation with the given QKV projection weights and input features.
     """
     model = CausalMultiHeadSelfAttention(d_model,num_heads)
-    return model(q_proj_weight,k_proj_weight,v_proj_weight,o_proj_weight,in_features)
+
+    model.q.weight = nn.Parameter(q_proj_weight)
+    model.k.weight = nn.Parameter(k_proj_weight)
+    model.v.weight = nn.Parameter(v_proj_weight)
+    model.o.weight = nn.Parameter(o_proj_weight)
+    return model(in_features)
 
 
 def run_multihead_self_attention_with_rope(
@@ -199,7 +205,11 @@ def run_multihead_self_attention_with_rope(
         implementation with the given QKV projection weights and input features.
     """
     model = CausalMultiHeadSelfAttention(d_model,num_heads,theta,max_seq_len)
-    return model(q_proj_weight,k_proj_weight,v_proj_weight,o_proj_weight,in_features,token_positions = token_positions)
+    model.q.weight = nn.Parameter(q_proj_weight)
+    model.k.weight = nn.Parameter(k_proj_weight)
+    model.v.weight = nn.Parameter(v_proj_weight)
+    model.o.weight = nn.Parameter(o_proj_weight)
+    return model(in_features,token_positions = token_positions)
 
 
 def run_rope(
@@ -296,7 +306,19 @@ def run_transformer_block(
         Float[Tensor, "batch sequence_length d_model"] Tensor with the output of
         running the Transformer block on the input features while using RoPE.
     """
-    raise NotImplementedError
+    model = TransformerBlock(d_model,num_heads,d_ff,theta,max_seq_len)
+
+    model.CMHA.q.weight = nn.Parameter(weights['attn.q_proj.weight'])
+    model.CMHA.k.weight = nn.Parameter(weights['attn.k_proj.weight'])
+    model.CMHA.v.weight = nn.Parameter(weights['attn.v_proj.weight'])
+    model.CMHA.o.weight = nn.Parameter(weights['attn.output_proj.weight'])
+    model.RMS1.weight = nn.Parameter(weights['ln1.weight'])
+    model.RMS2.weight = nn.Parameter(weights['ln2.weight'])
+    model.SwiGLU.W1.weight = nn.Parameter(weights['ffn.w1.weight'])
+    model.SwiGLU.W2.weight = nn.Parameter(weights['ffn.w2.weight'])
+    model.SwiGLU.W3.weight = nn.Parameter(weights['ffn.w3.weight'])
+
+    return model(in_features)
 
 
 def run_transformer_lm(

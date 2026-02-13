@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-from math import sqrt
 from einops import einsum
 
 class RMSnorm(nn.Module):
@@ -20,16 +19,7 @@ class RMSnorm(nn.Module):
     def forward(self,x:torch.Tensor)->torch.Tensor:
         #process an input tensor of shape (batch_size,sequence_length,d_model) and
         #return a tensor of the same shape
-        in_dtype = x.dtype
-        x = x.to(torch.float32)
-        result = [
-            [
-                [t/(sqrt(sum(l**2 for l in row)/self.d_model)+self.eps) for t in row]
-                for row in layer
-            ]
-            for layer in x
-        ]
-        result_tensor = torch.tensor(result,dtype = torch.float32)
-        true_resule = einsum(self.weight,result_tensor,'d_model,... d_model -> ... d_model')
-        return true_resule.to(in_dtype)
+        mean_square = x.pow(2).mean(-1, keepdim=True)
+        rms_inv = torch.rsqrt(mean_square + self.eps)
+        return x * rms_inv * self.weight
 
