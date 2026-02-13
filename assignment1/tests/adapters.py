@@ -20,7 +20,9 @@ from cs336_basics.Rope_class import  RoPe
 from cs336_basics.Dot_Product_Attention import softmax
 from cs336_basics.Dot_Product_Attention import Scaled_dot_product_attention
 from cs336_basics.Causal_Multi_Head_Self_Attention import CausalMultiHeadSelfAttention
-from cs336_basics.transformer_lm import TransformerBlock
+from cs336_basics.transformer_block import TransformerBlock
+from cs336_basics.Transformer_LM import TransfromerLM
+
 
 def run_linear(
     d_in: int,
@@ -397,10 +399,29 @@ def run_transformer_lm(
             `sequence_length` is at most `context_length`.
 
     Returns:
-        Float[Tensor, "batch_size sequence_length vocab_size"]: Tensor with the predicted unnormalized
+        Float[Tensor, "batch_size sequence_length vocab_size"]: Tensor with the predicted unnormalized  
         next-word distribution for each token.
     """
-    raise NotImplementedError
+    #Note that the output is unnormalized
+    model = TransfromerLM(vocab_size,context_length,num_layers,d_model,num_heads,d_ff,rope_theta,context_length)
+
+    model.embedding.weight = nn.Parameter(weights['token_embeddings.weight'])
+    for i in range(num_layers):
+        block = model.TransformerLayers[i]
+        prefix = f"layers.{i}"
+
+        block.CMHA.q.weight = nn.Parameter(weights[f"{prefix}.attn.q_proj.weight"])
+        block.CMHA.k.weight = nn.Parameter(weights[f"{prefix}.attn.k_proj.weight"])
+        block.CMHA.v.weight = nn.Parameter(weights[f"{prefix}.attn.v_proj.weight"])
+        block.CMHA.o.weight = nn.Parameter(weights[f"{prefix}.attn.output_proj.weight"])
+        block.RMS1.weight = nn.Parameter(weights[f"{prefix}.ln1.weight"])
+        block.RMS2.weight = nn.Parameter(weights[f"{prefix}.ln2.weight"])
+        block.SwiGLU.W1.weight = nn.Parameter(weights[f"{prefix}.ffn.w1.weight"])
+        block.SwiGLU.W2.weight = nn.Parameter(weights[f"{prefix}.ffn.w2.weight"])
+        block.SwiGLU.W3.weight = nn.Parameter(weights[f"{prefix}.ffn.w3.weight"])
+    model.norm.weight = nn.Parameter(weights['ln_final.weight'])
+    model.Linear.weight = nn.Parameter(weights['lm_head.weight'])
+    return model(in_indices)
 
 
 def run_rmsnorm(
