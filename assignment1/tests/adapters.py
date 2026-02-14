@@ -403,7 +403,7 @@ def run_transformer_lm(
         next-word distribution for each token.
     """
     #Note that the output is unnormalized
-    model = TransfromerLM(vocab_size,context_length,num_layers,d_model,num_heads,d_ff,rope_theta,context_length)
+    model = TransfromerLM(vocab_size,context_length,num_layers,d_model,num_heads,d_ff,rope_theta)
 
     model.embedding.weight = nn.Parameter(weights['token_embeddings.weight'])
     for i in range(num_layers):
@@ -421,6 +421,7 @@ def run_transformer_lm(
         block.SwiGLU.W3.weight = nn.Parameter(weights[f"{prefix}.ffn.w3.weight"])
     model.norm.weight = nn.Parameter(weights['ln_final.weight'])
     model.Linear.weight = nn.Parameter(weights['lm_head.weight'])
+    
     return model(in_indices)
 
 
