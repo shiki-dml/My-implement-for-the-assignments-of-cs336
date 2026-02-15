@@ -10,7 +10,7 @@ PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s
 
 
 
-def word_counting(text,vocab_count,pair_count):
+def word_counting(text,vocab_count,pair_count = None):
     #used to deal with each part returned by find_chunk_boundaries, in specific,
     #write down the newest token 
     tokens = re.findall(PAT,text)
@@ -21,11 +21,12 @@ def word_counting(text,vocab_count,pair_count):
             vocab_count[word_tuple] += 1
         else:
             vocab_count[word_tuple] = 1
-        for pair in pair_tuple:
-            if pair in pair_count:
-                pair_count[pair]+=1
-            else:
-                pair_count[pair]=1
+        if pair_count is not None:
+            for pair in pair_tuple:
+                if pair in pair_count:
+                    pair_count[pair]+=1
+                else:
+                    pair_count[pair]=1
             
 def update_word_counting_dict(original_tuple,merge_pair):#used to update the word_counting_dict
     i =0
@@ -40,10 +41,11 @@ def update_word_counting_dict(original_tuple,merge_pair):#used to update the wor
 
     return merge_tuple 
 
-def _process_chunk_worker(input_path, start, end, special_tokens):
+def _process_chunk_worker(args):
+
+    input_path, start, end, special_tokens = args
     
     local_word_counts = Counter()
-    local_pair_counts = Counter()
     
     with open(input_path, "rb") as f:
         f.seek(start)
@@ -55,9 +57,9 @@ def _process_chunk_worker(input_path, start, end, special_tokens):
         
     for part in parts:
         if part: 
-            word_counting(part, local_word_counts, local_pair_counts)
+            word_counting(part, local_word_counts, None)
                 
-    return local_word_counts, local_pair_counts
+    return local_word_counts
 
 def train_bpe(input_path,vocab_size,special_tokens):
     #input_path:str vocab_size:int special_tokens:list[str]
@@ -87,19 +89,19 @@ def train_bpe(input_path,vocab_size,special_tokens):
         tasks.append((input_path,start,end,special_tokens))
 
     with multiprocessing.Pool(processes=num_workers) as pool:
-        results = pool.starmap(_process_chunk_worker, tasks)
-    print("Finished counting words, starting aggregration")
-    for local_words, local_pairs in results:
-        for word,count in local_words.items():
-            word_counting_dict[word] = word_counting_dict.get(word,0) + count
-        for pair,count in local_pairs.items():
-            pair_counting_dict[pair] = pair_counting_dict.get(pair,0) + count
-
+        results = pool.imap_unordered(_process_chunk_worker, tasks)
+        print("Finished counting words, starting aggregration")
+        for local_words in results:
+            for word,count in local_words.items():
+                word_counting_dict[word] = word_counting_dict.get(word,0) + count
+        
+            del local_words
     #pair_to_words stores the words affected by each pair
     #in effect, which word contains which pair
-    for word in word_counting_dict.keys():
+    for word,count in word_counting_dict.items():
         for i in range(len(word)-1):
             pair = (word[i],word[i+1])
+            pair_counting_dict[pair] = pair_counting_dict.get(pair,0)+count
             pair_to_words[pair].add(word)
     print("Finished aggregration, starting BPE merges")
     pbar = tqdm(total=vocab_size - len(vocab))
