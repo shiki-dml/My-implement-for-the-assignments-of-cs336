@@ -87,7 +87,7 @@ def cosine_annealing_schedule(t,alpha_max,alpha_min,t_w,t_c):
     else:
         return alpha_min+(1+math.cos(math.pi*(t-t_w)/(t_c-t_w)))*(alpha_max-alpha_min)/2
     
-def gradient_clipping(parameters,max_l2_norm,eps = 0):
+def gradient_clipping(parameters,max_l2_norm,eps = 10e-6):
     total = []
     for p in parameters:
         if p.grad is None:
