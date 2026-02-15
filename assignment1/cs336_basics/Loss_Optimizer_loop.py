@@ -45,5 +45,44 @@ for t in range(10):
     loss.backward()
     opt.step()
 
+class AdamW(torch.optim.Optimizer):
+    def __init__(self,params,lr,weight_decay,betas = [0.9,0.999],eps = 10e-8,):
+        if lr<0:
+            raise ValueError("Invalid learning rate {lr}")
+        m = 0
+        v = 0 
+        defaults = {"lr":lr,"m":m,"v":v,"beta_1":betas[0],"beta_2":betas[1],"weight_decay":weight_decay,"eps":eps}
+        super().__init__(params,defaults)
+    def step(self,closure:Optional[Callable] = None):
+        lr = None if closure is None else closure()
+        for group in self.param_groups:
+            lr = group["lr"]
+            m = group["m"]
+            v = group["v"]
+            beta_1 = group["beta_1"]
+            beta_2 = group["beta_2"]
+            lamda = group["weight_decay"]
+            eps = group["eps"]
+            for p in group["params"]:
+                if p.grad == None:
+                    continue
+                state = self.state[p]
+                t = state.get("t",1)
+                grad = p.grad.data
+                m = beta_1*m+(1-beta_1)*grad
+                v = beta_2*v+(1-beta_2)*grad*grad
+                group["m"] = m
+                group["v"] = v
+                lr_t = lr*math.sqrt(1-beta_2**t)/(1-beta_1**t)
+                p.data -= lr_t*m/(eps+torch.sqrt(v))
+                p.data -= lr*lamda*p.data
+                state["t"] = t+1
+        return loss
 
-
+def cosine_annealing_schedule(t,alpha_max,alpha_min,t_w,t_c):
+    if t<t_w:
+        return t*alpha_max/t_w
+    elif t>t_c:
+        return alpha_min
+    else:
+        return alpha_min+(1+math.cos(math.pi*(t-t_w)/(t_c-t_w)))*(alpha_max-alpha_min)/2
