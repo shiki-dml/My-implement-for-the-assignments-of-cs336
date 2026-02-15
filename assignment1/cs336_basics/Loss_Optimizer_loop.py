@@ -51,14 +51,12 @@ class AdamW(torch.optim.Optimizer):
             raise ValueError("Invalid learning rate {lr}")
         m = 0
         v = 0 
-        defaults = {"lr":lr,"m":m,"v":v,"beta_1":betas[0],"beta_2":betas[1],"weight_decay":weight_decay,"eps":eps}
+        defaults = {"lr":lr,"beta_1":betas[0],"beta_2":betas[1],"weight_decay":weight_decay,"eps":eps}
         super().__init__(params,defaults)
     def step(self,closure:Optional[Callable] = None):
         lr = None if closure is None else closure()
         for group in self.param_groups:
             lr = group["lr"]
-            m = group["m"]
-            v = group["v"]
             beta_1 = group["beta_1"]
             beta_2 = group["beta_2"]
             lamda = group["weight_decay"]
@@ -67,12 +65,18 @@ class AdamW(torch.optim.Optimizer):
                 if p.grad == None:
                     continue
                 state = self.state[p]
+                if len(state) == 0:
+                    state["t"] = 1
+                    state["m"] = torch.zeros_like(p.data)
+                    state["v"] = torch.zeros_like(p.data)
+                m = state["m"]
+                v = state["v"]
                 t = state.get("t",1)
                 grad = p.grad.data
                 m = beta_1*m+(1-beta_1)*grad
                 v = beta_2*v+(1-beta_2)*grad*grad
-                group["m"] = m
-                group["v"] = v
+                state["m"] = m
+                state["v"] = v
                 lr_t = lr*math.sqrt(1-beta_2**t)/(1-beta_1**t)
                 p.data -= lr_t*m/(eps+torch.sqrt(v))
                 p.data -= lr*lamda*p.data
